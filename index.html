@@ -584,23 +584,29 @@
   </div>
 
   <!-- GOOGLE DRIVE MODAL -->
-  <div id="drive-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:100;align-items:center;justify-content:center;">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:min(560px,92vw);">
+  <div id="drive-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:100;align-items:center;justify-content:center;padding:12px;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;width:min(560px,100%);max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
         <span style="font-family:var(--mono);font-size:13px;color:var(--accent2);letter-spacing:0.08em;">☁ Google Drive 連携設定</span>
         <button onclick="closeDriveModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">×</button>
       </div>
 
-      <!-- STEP 1 -->
+      <!-- STEP 1: 折りたたみ式 -->
       <div style="margin-bottom:20px;">
-        <div style="font-family:var(--mono);font-size:11px;color:var(--accent2);margin-bottom:8px;letter-spacing:0.08em;">STEP 1 — Google Apps Script を作成</div>
-        <div style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:10px;">
-          1. <a href="https://script.google.com" target="_blank" style="color:var(--accent2);">script.google.com</a> を開く<br>
-          2. 「新しいプロジェクト」→ 下のコードを貼り付け → 1行目のSECRETを自分の合言葉に変更 → 保存（Ctrl+S）<br>
-          3. 「デプロイ」→「新しいデプロイ」→ 種類:ウェブアプリ → アクセス:全員 → デプロイ<br>
-          4. 表示された <strong style="color:var(--text);">ウェブアプリURL</strong> をコピーして下に貼り付け
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent2);margin-bottom:8px;letter-spacing:0.08em;display:flex;justify-content:space-between;align-items:center;">
+          <span>STEP 1 — Google Apps Script を作成（PCで実施）</span>
+          <button onclick="toggleStep1()" id="step1-toggle"
+            style="font-family:var(--mono);font-size:10px;padding:3px 10px;background:var(--surface2);
+                   border:1px solid var(--border);color:var(--muted);border-radius:4px;cursor:pointer;">折りたたむ</button>
         </div>
-        <div style="background:var(--surface2);border-radius:6px;padding:12px;font-family:var(--mono);font-size:11px;color:#a78bfa;line-height:1.7;position:relative;">
+        <div id="step1-content">
+          <div style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:10px;">
+            1. <a href="https://script.google.com" target="_blank" style="color:var(--accent2);">script.google.com</a> を開く<br>
+            2. 「新しいプロジェクト」→ 下のコードを貼り付け → 1行目のSECRETを自分の合言葉に変更 → 保存（Ctrl+S）<br>
+            3. 「デプロイ」→「新しいデプロイ」→ 種類:ウェブアプリ → アクセス:全員 → デプロイ<br>
+            4. 表示された <strong style="color:var(--text);">ウェブアプリURL</strong> をコピーして下に貼り付け
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:12px;font-family:var(--mono);font-size:11px;color:#a78bfa;line-height:1.7;position:relative;">
 <pre style="margin:0;white-space:pre-wrap;word-break:break-all;">const SECRET = 'ここを自分の合言葉に変える'; // 例: 'haneda2026fire'
 
 function doPost(e) {
@@ -627,9 +633,10 @@ function doGet(e) {
     DriveApp.getFileById(fileId).getBlob().getDataAsString()
   );
 }</pre>
-          <button onclick="copyGASCode()" style="position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:10px;
-            padding:4px 10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:4px;cursor:pointer;"
-            id="gas-copy-btn">コピー</button>
+            <button onclick="copyGASCode()" style="position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:10px;
+              padding:4px 10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:4px;cursor:pointer;"
+              id="gas-copy-btn">コピー</button>
+          </div>
         </div>
       </div>
 
@@ -1506,9 +1513,27 @@ function openDriveModal() {
   if (savedURL)    document.getElementById('gas-url-input').value    = savedURL;
   if (savedSecret) document.getElementById('gas-secret-input').value = savedSecret;
   document.getElementById('drive-test-result').innerHTML = '';
+  collapseStep1IfMobile();
 }
 function closeDriveModal() {
   document.getElementById('drive-modal').style.display = 'none';
+}
+
+function toggleStep1() {
+  const content = document.getElementById('step1-content');
+  const btn = document.getElementById('step1-toggle');
+  const isHidden = content.style.display === 'none';
+  content.style.display = isHidden ? '' : 'none';
+  btn.textContent = isHidden ? '折りたたむ' : '展開する';
+}
+
+// スマホでモーダルを開いたときSTEP1を自動で折りたたむ
+function collapseStep1IfMobile() {
+  if (window.innerWidth <= 480) {
+    const content = document.getElementById('step1-content');
+    const btn = document.getElementById('step1-toggle');
+    if (content) { content.style.display = 'none'; btn.textContent = '展開する'; }
+  }
 }
 
 function toggleSecretVisibility() {
