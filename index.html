@@ -103,6 +103,35 @@
   }
   .status-badge.ok { color: var(--accent); border-color: rgba(74,222,128,0.3); }
   .status-badge.err { color: var(--danger); border-color: rgba(248,113,113,0.3); }
+
+  /* ===== プレゼンモード ===== */
+  .present-hide { transition: filter 0.3s, opacity 0.3s; }
+  body.present-mode .present-hide {
+    filter: blur(8px);
+    opacity: 0.25;
+    pointer-events: none;
+    user-select: none;
+  }
+  body.present-mode #present-btn {
+    background: var(--accent3);
+    color: #0d0f14;
+    border-color: var(--accent3);
+  }
+  body.present-mode .present-badge {
+    display: inline-flex !important;
+  }
+  .present-badge {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(245,158,11,0.15);
+    color: var(--accent3);
+    border: 1px solid rgba(245,158,11,0.3);
+  }
   .bmenu-item {
     display:block;width:100%;text-align:left;padding:8px 12px;font-size:12px;
     font-family:var(--mono);background:transparent;border:none;color:var(--muted);
@@ -496,13 +525,21 @@
 <header>
   <div class="header-left">
     <h1>Asset Dashboard</h1>
-    <div class="total-display" id="total-display">
+    <div class="total-display present-hide" id="total-display">
       — <span class="unit">円</span>
     </div>
-    <div class="header-meta" id="header-meta">CSVをインポートして開始</div>
+    <div class="header-meta present-hide" id="header-meta">CSVをインポートして開始</div>
   </div>
   <div class="header-right">
     <div class="status-badge" id="status-badge">未読み込み</div>
+    <span class="present-badge">共有中 — 金額を隠しています</span>
+    <!-- プレゼンモード -->
+    <button id="present-btn" onclick="togglePresentMode()"
+      style="display:inline-flex;align-items:center;gap:6px;padding:9px 14px;
+        background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:6px;
+        font-size:12px;cursor:pointer;font-family:var(--mono);white-space:nowrap;transition:all 0.2s;">
+      ◎ 共有モード
+    </button>
     <!-- バックアップメニュー -->
     <div style="position:relative;" id="backup-menu-wrap">
       <button onclick="toggleBackupMenu()" style="display:inline-flex;align-items:center;gap:6px;padding:9px 14px;
@@ -671,23 +708,23 @@ function doGet(e) {
   <div class="kpi-row">
     <div class="kpi-card fire">
       <div class="kpi-label">FIRE 達成率</div>
-      <div class="kpi-value" id="kpi-fire-pct">—</div>
-      <div class="kpi-sub" id="kpi-fire-sub">目標資産額に対して</div>
+      <div class="kpi-value present-hide" id="kpi-fire-pct">—</div>
+      <div class="kpi-sub present-hide" id="kpi-fire-sub">目標資産額に対して</div>
     </div>
     <div class="kpi-card fire-status">
       <div class="kpi-label">FIRE 目標額（4%ルール）</div>
-      <div class="kpi-value" id="kpi-fire-target">—</div>
-      <div class="kpi-sub" id="kpi-fire-sub2">年間支出 × 25倍</div>
+      <div class="kpi-value present-hide" id="kpi-fire-target">—</div>
+      <div class="kpi-sub present-hide" id="kpi-fire-sub2">年間支出 × 25倍</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">金融資産</div>
-      <div class="kpi-value" id="kpi-financial">—</div>
-      <div class="kpi-sub">株・投信・暗号資産</div>
+      <div class="kpi-value present-hide" id="kpi-financial">—</div>
+      <div class="kpi-sub present-hide">株・投信・暗号資産</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">現金比率</div>
-      <div class="kpi-value" id="kpi-cash-ratio">—</div>
-      <div class="kpi-sub" id="kpi-cash-sub">現金・預金</div>
+      <div class="kpi-value present-hide" id="kpi-cash-ratio">—</div>
+      <div class="kpi-sub present-hide" id="kpi-cash-sub">現金・預金</div>
     </div>
   </div>
 
@@ -697,7 +734,7 @@ function doGet(e) {
     <div class="donut-wrap">
       <canvas id="donut-chart"></canvas>
       <div class="donut-center">
-        <div class="dc-value" id="dc-total">—</div>
+        <div class="dc-value present-hide" id="dc-total">—</div>
         <div class="dc-label">総資産</div>
       </div>
     </div>
@@ -713,7 +750,7 @@ function doGet(e) {
   <!-- TABLE -->
   <div class="card table-card">
     <div class="card-label">カテゴリ別残高</div>
-    <div id="table-content">
+    <div id="table-content" class="present-hide">
       <div class="empty-state">
         <div class="es-icon">⊞</div>
         <div class="es-title">データなし</div>
@@ -727,7 +764,7 @@ function doGet(e) {
     <div class="fire-rows">
       <div class="fire-row">
         <span class="fr-label">年間生活費（目標）</span>
-        <span class="fr-value">
+        <span class="fr-value present-hide">
           <input id="annual-expense" type="number" value="3600000"
             style="background:var(--surface2);border:1px solid var(--border);color:var(--text);
                    font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:4px;width:110px;text-align:right;"
@@ -738,11 +775,11 @@ function doGet(e) {
       <div class="fire-divider"></div>
       <div class="fire-row">
         <span class="fr-label">FIRE目標額（25倍）</span>
-        <span class="fr-value" id="fire-target-disp">—</span>
+        <span class="fr-value present-hide" id="fire-target-disp">—</span>
       </div>
       <div class="fire-row">
         <span class="fr-label">現在の総資産</span>
-        <span class="fr-value" id="fire-current">—</span>
+        <span class="fr-value present-hide" id="fire-current">—</span>
       </div>
       <div class="fire-divider"></div>
     </div>
@@ -751,21 +788,21 @@ function doGet(e) {
     </div>
     <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;">
       <span>0%</span>
-      <span id="fire-pct-label">—</span>
+      <span id="fire-pct-label" class="present-hide">—</span>
       <span>100%</span>
     </div>
     <div class="fire-rows" style="margin-top:16px;">
       <div class="fire-row">
         <span class="fr-label">残り必要額</span>
-        <span class="fr-value" id="fire-gap">—</span>
+        <span class="fr-value present-hide" id="fire-gap">—</span>
       </div>
       <div class="fire-row">
         <span class="fr-label">月360万積立なら</span>
-        <span class="fr-value green" id="fire-years">—</span>
+        <span class="fr-value green present-hide" id="fire-years">—</span>
       </div>
       <div class="fire-row">
         <span class="fr-label">4%取り崩し（年間）</span>
-        <span class="fr-value green" id="fire-income">—</span>
+        <span class="fr-value green present-hide" id="fire-income">—</span>
       </div>
     </div>
   </div>
@@ -1657,6 +1694,25 @@ async function loadFromDrive() {
     }
   } catch(e) {
     console.log('Drive自動読み込みスキップ:', e.message);
+  }
+}
+
+// ============================================================
+// 共有モード（金額を隠す）
+// ============================================================
+let presentMode = false;
+
+function togglePresentMode() {
+  presentMode = !presentMode;
+  document.body.classList.toggle('present-mode', presentMode);
+  const btn = document.getElementById('present-btn');
+  btn.textContent = presentMode ? '◎ 共有中（タップで解除）' : '◎ 共有モード';
+
+  // Y軸の数値を隠す／表示する
+  if (historyChart) {
+    historyChart.options.scales.y.ticks.display = !presentMode;
+    historyChart.options.plugins.tooltip.enabled = !presentMode;
+    historyChart.update();
   }
 }
 
