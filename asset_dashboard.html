@@ -1,0 +1,1653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>資産ダッシュボード</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #161921;
+    --surface2: #1e2330;
+    --border: rgba(255,255,255,0.07);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #4ade80;
+    --accent2: #60a5fa;
+    --accent3: #f59e0b;
+    --danger: #f87171;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Noto Sans JP', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-weight: 300;
+    min-height: 100vh;
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    padding: 28px 32px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header-left h1 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .header-left .total-display {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    margin-top: 4px;
+    transition: all 0.4s ease;
+  }
+  .header-left .total-display .unit {
+    font-size: 16px;
+    color: var(--muted);
+    margin-left: 4px;
+  }
+  .header-meta {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: var(--mono);
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .import-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    background: var(--accent);
+    color: #0d0f14;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .import-label:hover { opacity: 0.85; }
+  #csv-input { display: none; }
+  .status-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .status-badge.ok { color: var(--accent); border-color: rgba(74,222,128,0.3); }
+  .status-badge.err { color: var(--danger); border-color: rgba(248,113,113,0.3); }
+  .bmenu-item {
+    display:block;width:100%;text-align:left;padding:8px 12px;font-size:12px;
+    font-family:var(--mono);background:transparent;border:none;color:var(--muted);
+    border-radius:5px;cursor:pointer;transition:background 0.15s;
+  }
+  .bmenu-item:hover { background:var(--surface2);color:var(--text); }
+
+  /* ===== MAIN GRID ===== */
+  main {
+    padding: 24px 32px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+  }
+  .card-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* ===== KPI CARDS (row 1) ===== */
+  .kpi-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .kpi-card .kpi-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .kpi-card .kpi-value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text);
+    transition: all 0.4s;
+  }
+  .kpi-card .kpi-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .kpi-card.fire .kpi-value { color: var(--accent); }
+  .kpi-card.fire-status .kpi-value { color: var(--accent3); }
+
+  /* ===== DONUT (col 1, row 2) ===== */
+  .donut-card {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .donut-wrap {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    margin: 0 auto;
+  }
+  .donut-center {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+  }
+  .donut-center .dc-value {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .donut-center .dc-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .legend {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .legend-item .li-name { flex: 1; }
+  .legend-item .li-pct {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* ===== CATEGORY TABLE (col 2, row 2) ===== */
+  .table-card {
+    grid-column: 2;
+    grid-row: 2;
+    overflow-y: auto;
+    max-height: 380px;
+  }
+  .asset-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .asset-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 0 0 10px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+    text-align: left;
+  }
+  .asset-table th:last-child { text-align: right; }
+  .asset-table td {
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: var(--text);
+    vertical-align: middle;
+  }
+  .asset-table td:last-child {
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .asset-table tr:last-child td { border-bottom: none; }
+  .cat-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--surface2);
+    color: var(--muted);
+    margin-right: 6px;
+  }
+  .bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bar-bg {
+    flex: 1;
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  /* ===== FIRE CARD (col 3, row 2) ===== */
+  .fire-card {
+    grid-column: 3;
+    grid-row: 2;
+    background: linear-gradient(135deg, #161921 0%, #1a1f2e 100%);
+    border-color: rgba(74,222,128,0.15);
+  }
+  .fire-meter {
+    position: relative;
+    margin: 16px 0;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .fire-meter-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4ade80, #86efac);
+    border-radius: 4px;
+    transition: width 0.8s ease;
+  }
+  .fire-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .fire-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    align-items: center;
+  }
+  .fire-row .fr-label { color: var(--muted); }
+  .fire-row .fr-value {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+  }
+  .fire-row .fr-value.green { color: var(--accent); }
+  .fire-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+  }
+
+  /* ===== HISTORY CHART (row 3, full width) ===== */
+  .history-card {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .history-tabs {
+    display: flex;
+    gap: 4px;
+  }
+  .htab {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .htab.active {
+    background: var(--surface2);
+    color: var(--text);
+    border-color: rgba(255,255,255,0.15);
+  }
+  .chart-container { position: relative; height: 200px; }
+
+  /* ===== IMPORT OVERLAY ===== */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+  }
+  .empty-state .es-icon {
+    font-size: 32px;
+    margin-bottom: 16px;
+    opacity: 0.4;
+  }
+  .empty-state .es-title {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .empty-state .es-sub {
+    font-size: 12px;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  /* ===== SCROLLBAR ===== */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 2px; }
+
+  /* ===== ANIMATION ===== */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .card, .kpi-card { animation: fadeUp 0.4s ease both; }
+
+  @media (max-width: 480px) {
+    .btn-full { display: none; }
+    .btn-short { display: inline !important; }
+  }
+  @media (max-width: 768px) {
+    header {
+      padding: 16px 16px 14px;
+      gap: 10px;
+    }
+    .header-left .total-display { font-size: 28px; }
+    .header-right { flex-wrap: wrap; gap: 8px; }
+    .import-label { padding: 8px 14px; font-size: 12px; }
+
+    main {
+      padding: 12px 16px;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .donut-card { grid-column: 1; grid-row: 2; }
+    .table-card { grid-column: 2; grid-row: 2; max-height: 320px; }
+    .fire-card   { grid-column: 1 / -1; grid-row: 3; }
+    .history-card { grid-column: 1 / -1; grid-row: 4; }
+  }
+
+  /* ===== RESPONSIVE: スマホ (〜480px) ===== */
+  @media (max-width: 480px) {
+    header { padding: 14px 14px 12px; }
+    .header-left h1 { font-size: 11px; }
+    .header-left .total-display { font-size: 24px; }
+    .header-right { width: 100%; justify-content: flex-end; }
+    .status-badge { display: none; }
+
+    main {
+      padding: 10px 12px;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    /* KPI: 2列 × 2行 */
+    .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .kpi-card { padding: 14px 16px; }
+    .kpi-card .kpi-value { font-size: 18px; }
+    .kpi-card .kpi-label { font-size: 9px; }
+
+    /* カード全幅 */
+    .donut-card  { grid-column: 1; grid-row: auto; }
+    .table-card  { grid-column: 1; grid-row: auto; max-height: none; }
+    .fire-card   { grid-column: 1; grid-row: auto; }
+    .history-card { grid-column: 1; grid-row: auto; }
+    .card { padding: 14px 16px; }
+
+    /* ドーナツ: スマホでは横並びに */
+    .donut-card > .card-label { margin-bottom: 10px; }
+    .donut-wrap { width: 140px; height: 140px; }
+    .donut-center .dc-value { font-size: 13px; }
+
+    /* 推移グラフのタブ: 折り返し */
+    .history-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .history-tabs { flex-wrap: wrap; }
+    .htab { padding: 4px 10px; font-size: 10px; }
+    .chart-container { height: 160px; }
+
+    /* FIREカードの入力欄 */
+    .fire-row { flex-wrap: wrap; gap: 4px; }
+    #annual-expense { width: 90px; font-size: 11px; }
+
+    /* テーブル: 比率列を非表示 */
+    .asset-table td:nth-child(2),
+    .asset-table th:nth-child(2) { display: none; }
+
+    /* バックアップメニュー: 左側に展開 */
+    #backup-menu { right: auto; left: 0; min-width: 180px; }
+  }
+
+  /* ===== タッチデバイス向け: タップ領域拡大 ===== */
+  @media (hover: none) {
+    .htab { padding: 7px 14px; }
+    .bmenu-item { padding: 11px 14px; }
+    .import-label { padding: 11px 18px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Asset Dashboard</h1>
+    <div class="total-display" id="total-display">
+      — <span class="unit">円</span>
+    </div>
+    <div class="header-meta" id="header-meta">CSVをインポートして開始</div>
+  </div>
+  <div class="header-right">
+    <div class="status-badge" id="status-badge">未読み込み</div>
+    <!-- バックアップメニュー -->
+    <div style="position:relative;" id="backup-menu-wrap">
+      <button onclick="toggleBackupMenu()" style="display:inline-flex;align-items:center;gap:6px;padding:9px 14px;
+        background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:6px;
+        font-size:12px;cursor:pointer;font-family:var(--mono);white-space:nowrap;">
+        ⬡ バックアップ ▾
+      </button>
+      <div id="backup-menu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);
+        background:var(--surface);border:1px solid var(--border);border-radius:8px;
+        padding:6px;min-width:200px;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+        <button onclick="exportJSON()" class="bmenu-item">↓ JSONエクスポート</button>
+        <label class="bmenu-item" for="json-import-input" style="cursor:pointer;">↑ JSONインポート</label>
+        <input type="file" id="json-import-input" accept=".json" style="display:none">
+        <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+        <button onclick="openDriveModal()" class="bmenu-item" style="color:var(--accent2);">☁ Google Drive 設定</button>
+        <button onclick="saveToDrive()" id="btn-save-drive" class="bmenu-item" style="color:var(--accent2);display:none;">☁ Driveに今すぐ保存</button>
+      </div>
+    </div>
+    <button class="import-label" onclick="openMFModal()">
+      <span class="btn-full">＋ MFデータ貼り付け</span>
+      <span class="btn-short" style="display:none">＋ MF</span>
+    </button>
+    <label class="import-label" for="csv-input" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);">
+      CSV
+    </label>
+    <input type="file" id="csv-input" accept=".csv">
+  </div>
+
+  <!-- MF PASTE MODAL -->
+  <div id="mf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:100;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:min(640px,92vw);max-height:88vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div style="display:flex;gap:4px;">
+          <button class="modal-tab active" id="mtab-now" onclick="switchModalTab('now')"
+            style="font-family:var(--mono);font-size:12px;padding:6px 14px;border-radius:5px;border:1px solid var(--border);
+                   background:var(--surface2);color:var(--text);cursor:pointer;">今月データ</button>
+          <button class="modal-tab" id="mtab-hist" onclick="switchModalTab('hist')"
+            style="font-family:var(--mono);font-size:12px;padding:6px 14px;border-radius:5px;border:1px solid var(--border);
+                   background:transparent;color:var(--muted);cursor:pointer;">過去推移データ</button>
+        </div>
+        <button onclick="closeMFModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">×</button>
+      </div>
+
+      <!-- TAB: 今月データ -->
+      <div id="mpanel-now">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
+          マネーフォワード ME の「資産構成」画面を全選択（Ctrl+A）→ コピー（Ctrl+C）して貼り付けてください。
+        </div>
+        <textarea id="mf-paste-area"
+          placeholder="ここにマネーフォワードの資産構成テキストを貼り付け..."
+          style="width:100%;height:200px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+                 color:var(--text);font-family:var(--mono);font-size:12px;padding:12px;resize:vertical;
+                 outline:none;line-height:1.6;"></textarea>
+        <div id="mf-parse-preview" style="margin-top:10px;font-size:12px;min-height:20px;"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">
+          <button onclick="closeMFModal()" style="padding:9px 20px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;cursor:pointer;font-size:13px;">キャンセル</button>
+          <button onclick="applyMFData()" style="padding:9px 20px;background:var(--accent);color:#0d0f14;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;">読み込む</button>
+        </div>
+      </div>
+
+      <!-- TAB: 過去推移データ -->
+      <div id="mpanel-hist" style="display:none;">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
+          MF MEの「資産推移」画面（PC版）のテーブルを全選択 → コピーして貼り付けてください。<br>
+          日付・合計・カテゴリ別の列があるデータを認識します。月末データのみを推移グラフに取り込みます。
+        </div>
+        <textarea id="mf-hist-area"
+          placeholder="日付	合計	預金・現金・暗号資産	株式(現物)	投資信託 ...（タブ区切りテキスト）"
+          style="width:100%;height:220px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+                 color:var(--text);font-family:var(--mono);font-size:11px;padding:12px;resize:vertical;
+                 outline:none;line-height:1.6;"></textarea>
+        <div id="mf-hist-preview" style="margin-top:10px;font-size:12px;min-height:20px;"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end;">
+          <button onclick="closeMFModal()" style="padding:9px 20px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;cursor:pointer;font-size:13px;">キャンセル</button>
+          <button onclick="applyHistData()" style="padding:9px 20px;background:var(--accent2);color:#0d0f14;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;">推移データを取込</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GOOGLE DRIVE MODAL -->
+  <div id="drive-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:100;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:28px;width:min(560px,92vw);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <span style="font-family:var(--mono);font-size:13px;color:var(--accent2);letter-spacing:0.08em;">☁ Google Drive 連携設定</span>
+        <button onclick="closeDriveModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">×</button>
+      </div>
+
+      <!-- STEP 1 -->
+      <div style="margin-bottom:20px;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent2);margin-bottom:8px;letter-spacing:0.08em;">STEP 1 — Google Apps Script を作成</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:10px;">
+          1. <a href="https://script.google.com" target="_blank" style="color:var(--accent2);">script.google.com</a> を開く<br>
+          2. 「新しいプロジェクト」→ 下のコードを貼り付け → 1行目のSECRETを自分の合言葉に変更 → 保存（Ctrl+S）<br>
+          3. 「デプロイ」→「新しいデプロイ」→ 種類:ウェブアプリ → アクセス:全員 → デプロイ<br>
+          4. 表示された <strong style="color:var(--text);">ウェブアプリURL</strong> をコピーして下に貼り付け
+        </div>
+        <div style="background:var(--surface2);border-radius:6px;padding:12px;font-family:var(--mono);font-size:11px;color:#a78bfa;line-height:1.7;position:relative;">
+<pre style="margin:0;white-space:pre-wrap;word-break:break-all;">const SECRET = 'ここを自分の合言葉に変える'; // 例: 'haneda2026fire'
+
+function doPost(e) {
+  if (e.parameter.key !== SECRET) {
+    return ContentService.createTextOutput('unauthorized');
+  }
+  var data = e.postData.contents;
+  var fileId = PropertiesService.getScriptProperties().getProperty('FILE_ID');
+  if (!fileId) {
+    var file = DriveApp.createFile('asset_history.json', data, 'application/json');
+    PropertiesService.getScriptProperties().setProperty('FILE_ID', file.getId());
+  } else {
+    DriveApp.getFileById(fileId).setContent(data);
+  }
+  return ContentService.createTextOutput('ok');
+}
+function doGet(e) {
+  if (e.parameter.key !== SECRET) {
+    return ContentService.createTextOutput('unauthorized');
+  }
+  var fileId = PropertiesService.getScriptProperties().getProperty('FILE_ID');
+  if (!fileId) return ContentService.createTextOutput('[]');
+  return ContentService.createTextOutput(
+    DriveApp.getFileById(fileId).getBlob().getDataAsString()
+  );
+}</pre>
+          <button onclick="copyGASCode()" style="position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:10px;
+            padding:4px 10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);border-radius:4px;cursor:pointer;"
+            id="gas-copy-btn">コピー</button>
+        </div>
+      </div>
+
+      <!-- STEP 2 -->
+      <div style="margin-bottom:20px;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--accent2);margin-bottom:8px;letter-spacing:0.08em;">STEP 2 — シークレットキーとURLを入力</div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input id="gas-secret-input" type="password" placeholder="GASコードに設定した合言葉"
+            style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+                   color:var(--text);font-family:var(--mono);font-size:12px;padding:10px 12px;outline:none;">
+          <button onclick="toggleSecretVisibility()" id="secret-toggle-btn"
+            style="padding:0 12px;background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+                   border-radius:6px;cursor:pointer;font-size:11px;font-family:var(--mono);white-space:nowrap;">表示</button>
+        </div>
+        <input id="gas-url-input" type="text" placeholder="https://script.google.com/macros/s/xxxx/exec"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+                 color:var(--text);font-family:var(--mono);font-size:12px;padding:10px 12px;outline:none;">
+        <div id="drive-test-result" style="margin-top:8px;font-size:12px;min-height:18px;"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="testDriveConnection()" style="padding:9px 18px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;cursor:pointer;font-size:13px;">接続テスト</button>
+        <button onclick="saveDriveSettings()" style="padding:9px 18px;background:var(--accent2);color:#0d0f14;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;">保存して有効化</button>
+      </div>
+    </div>
+  </div>
+
+</header>
+
+<main>
+  <!-- KPI ROW -->
+  <div class="kpi-row">
+    <div class="kpi-card fire">
+      <div class="kpi-label">FIRE 達成率</div>
+      <div class="kpi-value" id="kpi-fire-pct">—</div>
+      <div class="kpi-sub" id="kpi-fire-sub">目標資産額に対して</div>
+    </div>
+    <div class="kpi-card fire-status">
+      <div class="kpi-label">FIRE 目標額（4%ルール）</div>
+      <div class="kpi-value" id="kpi-fire-target">—</div>
+      <div class="kpi-sub" id="kpi-fire-sub2">年間支出 × 25倍</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">金融資産</div>
+      <div class="kpi-value" id="kpi-financial">—</div>
+      <div class="kpi-sub">株・投信・暗号資産</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">現金比率</div>
+      <div class="kpi-value" id="kpi-cash-ratio">—</div>
+      <div class="kpi-sub" id="kpi-cash-sub">現金・預金</div>
+    </div>
+  </div>
+
+  <!-- DONUT -->
+  <div class="card donut-card">
+    <div class="card-label">ポートフォリオ構成</div>
+    <div class="donut-wrap">
+      <canvas id="donut-chart"></canvas>
+      <div class="donut-center">
+        <div class="dc-value" id="dc-total">—</div>
+        <div class="dc-label">総資産</div>
+      </div>
+    </div>
+    <div class="legend" id="donut-legend">
+      <div class="empty-state">
+        <div class="es-icon">◎</div>
+        <div class="es-title">データなし</div>
+        <div class="es-sub">CSVを読み込んでください</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card table-card">
+    <div class="card-label">カテゴリ別残高</div>
+    <div id="table-content">
+      <div class="empty-state">
+        <div class="es-icon">⊞</div>
+        <div class="es-title">データなし</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIRE -->
+  <div class="card fire-card">
+    <div class="card-label">FIRE シミュレーション</div>
+    <div class="fire-rows">
+      <div class="fire-row">
+        <span class="fr-label">年間生活費（目標）</span>
+        <span class="fr-value">
+          <input id="annual-expense" type="number" value="3600000"
+            style="background:var(--surface2);border:1px solid var(--border);color:var(--text);
+                   font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:4px;width:110px;text-align:right;"
+            oninput="recalcFIRE()">
+          <span style="font-size:11px;color:var(--muted);margin-left:4px;">円/年</span>
+        </span>
+      </div>
+      <div class="fire-divider"></div>
+      <div class="fire-row">
+        <span class="fr-label">FIRE目標額（25倍）</span>
+        <span class="fr-value" id="fire-target-disp">—</span>
+      </div>
+      <div class="fire-row">
+        <span class="fr-label">現在の総資産</span>
+        <span class="fr-value" id="fire-current">—</span>
+      </div>
+      <div class="fire-divider"></div>
+    </div>
+    <div class="fire-meter">
+      <div class="fire-meter-fill" id="fire-meter-fill" style="width:0%"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:4px;">
+      <span>0%</span>
+      <span id="fire-pct-label">—</span>
+      <span>100%</span>
+    </div>
+    <div class="fire-rows" style="margin-top:16px;">
+      <div class="fire-row">
+        <span class="fr-label">残り必要額</span>
+        <span class="fr-value" id="fire-gap">—</span>
+      </div>
+      <div class="fire-row">
+        <span class="fr-label">月360万積立なら</span>
+        <span class="fr-value green" id="fire-years">—</span>
+      </div>
+      <div class="fire-row">
+        <span class="fr-label">4%取り崩し（年間）</span>
+        <span class="fr-value green" id="fire-income">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY CHART -->
+  <div class="card history-card">
+    <div class="history-header">
+      <div class="card-label" style="margin-bottom:0" id="history-title">資産推移</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+        <div class="history-tabs" style="margin-right:4px;">
+          <button class="htab active" onclick="switchHistory('total',this)">総資産</button>
+          <button class="htab" onclick="switchHistory('financial',this)">金融</button>
+          <button class="htab" onclick="switchHistory('cash',this)">現金</button>
+        </div>
+        <div class="history-tabs" id="period-tabs">
+          <button class="htab ptab active" onclick="switchPeriod(12,this)">1年</button>
+          <button class="htab ptab" onclick="switchPeriod(36,this)">3年</button>
+          <button class="htab ptab" onclick="switchPeriod(60,this)">5年</button>
+          <button class="htab ptab" onclick="switchPeriod(120,this)">10年</button>
+          <button class="htab ptab" onclick="switchPeriod(0,this)">全期間</button>
+        </div>
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="history-chart"></canvas>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--muted);font-family:var(--mono);">
+      ※ MFデータを貼り付けるたびに月次データが自動蓄積されます（最大120ヶ月）
+    </div>
+  </div>
+</main>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let state = {
+  total: 0,
+  categories: [],
+  byType: { financial: 0, real: 0, cash: 0 },
+  history: loadHistory(),
+  lastUpdated: null
+};
+
+let currentHistoryKey = 'total';
+let currentPeriod = 12; // months, 0 = all
+
+const CAT_COLORS = {
+  '預金・現金・暗号資産': '#94a3b8',
+  '株式（現物）':         '#4ade80',
+  '投資信託':             '#a78bfa',
+  '不動産':               '#fbbf24',
+  '年金':                 '#60a5fa',
+  'その他の資産':         '#6b7280',
+  'ポイント・マイル':     '#f97316',
+  // CSV方式との互換
+  '日本株・ETF':   '#4ade80',
+  '米国株・ETF':   '#34d399',
+  '現金・預金':    '#94a3b8',
+  '暗号資産':      '#f97316',
+  '太陽光発電':    '#fbbf24',
+};
+
+// ============================================================
+// MF TEXT PARSER
+// ============================================================
+function parseMFText(text) {
+  const result = { total: 0, categories: [], byType: { financial: 0, real: 0, cash: 0 }, errors: [] };
+
+  // 資産総額を抽出
+  const totalMatch = text.match(/資産総額[：:]\s*([\d,]+)円/);
+  if (!totalMatch) {
+    result.errors.push('「資産総額」が見つかりません。テキストを確認してください。');
+    return result;
+  }
+  result.total = parseInt(totalMatch[1].replace(/,/g, ''));
+
+  // カテゴリ別金額を抽出
+  // 例: " 預金・現金・暗号資産	7,471,678円	10.95%"
+  const catPattern = /([^\t\n　]+?)\t([\d,]+)円\t[\d.]+%/g;
+  let m;
+  const cats = [];
+  while ((m = catPattern.exec(text)) !== null) {
+    const name = m[1].trim().replace(/^\s+/, '');
+    const amount = parseInt(m[2].replace(/,/g, ''));
+    if (!isNaN(amount) && amount > 0 && name.length < 20) {
+      cats.push({ name, total: amount });
+    }
+  }
+
+  // 重複除去・合計整合
+  const seen = new Set();
+  let catTotal = 0;
+  for (const c of cats) {
+    if (seen.has(c.name)) continue;
+    seen.add(c.name);
+    catTotal += c.total;
+    result.categories.push(c);
+  }
+
+  // 構成比付与
+  result.categories.forEach(c => {
+    c.ratio = result.total > 0 ? c.total / result.total * 100 : 0;
+  });
+
+  // タイプ別集計（MFカテゴリに合わせてマッピング）
+  const FINANCIAL_CATS = ['株式（現物）','投資信託','年金'];
+  const CASH_CATS = ['預金・現金・暗号資産'];
+  const REAL_CATS = ['不動産'];
+  result.byType.financial = result.categories
+    .filter(c => FINANCIAL_CATS.includes(c.name)).reduce((s,c) => s+c.total, 0);
+  result.byType.cash = result.categories
+    .filter(c => CASH_CATS.includes(c.name)).reduce((s,c) => s+c.total, 0);
+  result.byType.real = result.categories
+    .filter(c => REAL_CATS.includes(c.name)).reduce((s,c) => s+c.total, 0);
+
+  if (result.categories.length === 0) {
+    result.errors.push('カテゴリデータが読み取れませんでした。テキストを確認してください。');
+  }
+  return result;
+}
+
+// ============================================================
+// MF MODAL
+// ============================================================
+function openMFModal() {
+  document.getElementById('mf-modal').style.display = 'flex';
+  document.getElementById('mf-paste-area').focus();
+}
+function closeMFModal() {
+  document.getElementById('mf-modal').style.display = 'none';
+  document.getElementById('mf-parse-preview').innerHTML = '';
+  document.getElementById('mf-hist-preview').innerHTML = '';
+  document.getElementById('mf-paste-area').value = '';
+  document.getElementById('mf-hist-area').value = '';
+}
+function switchModalTab(tab) {
+  document.getElementById('mpanel-now').style.display  = tab==='now'  ? '' : 'none';
+  document.getElementById('mpanel-hist').style.display = tab==='hist' ? '' : 'none';
+  document.getElementById('mtab-now').style.background  = tab==='now'  ? 'var(--surface2)' : 'transparent';
+  document.getElementById('mtab-hist').style.background = tab==='hist' ? 'var(--surface2)' : 'transparent';
+  document.getElementById('mtab-now').style.color  = tab==='now'  ? 'var(--text)' : 'var(--muted)';
+  document.getElementById('mtab-hist').style.color = tab==='hist' ? 'var(--text)' : 'var(--muted)';
+}
+
+document.getElementById('mf-paste-area').addEventListener('input', () => {
+  const text = document.getElementById('mf-paste-area').value;
+  if (text.length < 30) { document.getElementById('mf-parse-preview').innerHTML = ''; return; }
+  const result = parseMFText(text);
+  const preview = document.getElementById('mf-parse-preview');
+  if (result.errors.length > 0) {
+    preview.innerHTML = `<span style="color:var(--danger)">⚠ ${result.errors[0]}</span>`;
+  } else {
+    const catList = result.categories.slice(0,4).map(c =>
+      `<span style="color:var(--muted)">${c.name} <span style="color:var(--text)">${fmtM(c.total)}</span></span>`
+    ).join('　');
+    preview.innerHTML = `<span style="color:var(--accent)">✓ 総資産 ${fmtFull(result.total)} / ${result.categories.length}カテゴリ検出</span><br><span style="font-size:11px;">${catList}${result.categories.length>4?' …':''}`;
+  }
+});
+
+// 過去推移データ: リアルタイムプレビュー
+document.getElementById('mf-hist-area').addEventListener('input', () => {
+  const text = document.getElementById('mf-hist-area').value;
+  if (text.length < 20) { document.getElementById('mf-hist-preview').innerHTML = ''; return; }
+  const entries = parseMFHistoryText(text);
+  const preview = document.getElementById('mf-hist-preview');
+  if (entries.length === 0) {
+    preview.innerHTML = `<span style="color:var(--danger)">⚠ データを認識できません。タブ区切りのテキストを貼り付けてください。</span>`;
+  } else {
+    const months = entries.filter(e => e.isMonthEnd);
+    preview.innerHTML = `<span style="color:var(--accent2)">✓ ${entries.length}行認識（月末データ ${months.length}件を推移グラフに取込）</span><br>`
+      + `<span style="font-size:11px;color:var(--muted)">期間: ${entries[entries.length-1]?.date} 〜 ${entries[0]?.date}</span>`;
+  }
+});
+
+function applyMFData() {
+  const text = document.getElementById('mf-paste-area').value;
+  const result = parseMFText(text);
+  const badge = document.getElementById('status-badge');
+
+  if (result.errors.length > 0 || result.categories.length === 0) {
+    document.getElementById('mf-parse-preview').innerHTML =
+      `<span style="color:var(--danger)">⚠ ${result.errors[0] || 'データが読み取れませんでした'}</span>`;
+    return;
+  }
+
+  const now = new Date();
+  state.total = result.total;
+  state.categories = result.categories;
+  state.byType = result.byType;
+  state.lastUpdated = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()}`;
+  state.history = saveHistoryEntry(result);
+
+  updateUI();
+  updateHistoryChart();
+  closeMFModal();
+
+  badge.textContent = '読み込み完了 ✓';
+  badge.className = 'status-badge ok';
+  setTimeout(() => { badge.textContent = state.lastUpdated + ' 更新'; }, 2000);
+}
+
+// ============================================================
+// MF 推移データ パーサー
+// ============================================================
+function parseMFHistoryText(text) {
+  const lines = text.trim().split('\n');
+  const entries = [];
+
+  for (const line of lines) {
+    const cols = line.split('\t').map(c => c.replace(/円|,/g, '').trim());
+    if (cols.length < 2) continue;
+
+    // 日付列を判定
+    const dateRaw = cols[0];
+    let dateKey = null;
+    let isMonthEnd = false;
+
+    // 「YYYY-MM月末」形式
+    const meMatch = dateRaw.match(/(\d{4})-(\d{2})月末/);
+    if (meMatch) {
+      dateKey = `${meMatch[1]}-${meMatch[2]}`;
+      isMonthEnd = true;
+    }
+    // 「YYYY-MM-DD」形式 → 月末判定は別途
+    const dayMatch = dateRaw.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (dayMatch) {
+      dateKey = `${dayMatch[1]}-${dayMatch[2]}`;
+      // 日別データの場合、月の最終日のみ月末とみなす（暫定: その月の最小日付 = 月初扱いしない）
+      isMonthEnd = false; // 日別は月末フラグなし（月末行が別途ある場合はそちら優先）
+    }
+
+    if (!dateKey) continue;
+
+    // 合計金額
+    const total = parseInt(cols[1]);
+    if (isNaN(total) || total < 100000) continue;
+
+    // カテゴリ列（3列目以降）
+    const financial = (parseInt(cols[3])||0) + (parseInt(cols[4])||0) + (parseInt(cols[6])||0); // 株式+投信+年金
+    const cash = parseInt(cols[2]) || 0; // 預金・現金
+
+    entries.push({ date: dateKey, total, financial, cash, isMonthEnd, dateRaw });
+  }
+
+  return entries;
+}
+
+function applyHistData() {
+  const text = document.getElementById('mf-hist-area').value;
+  const entries = parseMFHistoryText(text);
+
+  if (entries.length === 0) {
+    document.getElementById('mf-hist-preview').innerHTML =
+      `<span style="color:var(--danger)">⚠ データを認識できませんでした</span>`;
+    return;
+  }
+
+  // 月末データのみ抽出。同じ月キーは月末フラグ優先、なければ最後の日付を使用
+  const byMonth = {};
+  for (const e of entries) {
+    if (!byMonth[e.date] || e.isMonthEnd) {
+      byMonth[e.date] = e;
+    }
+  }
+
+  // 既存の履歴とマージ
+  const hist = loadHistory();
+  let added = 0;
+  for (const [dateKey, e] of Object.entries(byMonth)) {
+    const existing = hist.findIndex(h => h.date === dateKey);
+    const entry = { date: dateKey, total: e.total, financial: e.financial, cash: e.cash };
+    if (existing >= 0) {
+      hist[existing] = entry;
+    } else {
+      hist.push(entry);
+      added++;
+    }
+  }
+  hist.sort((a,b) => a.date.localeCompare(b.date));
+  if (hist.length > 120) hist.splice(0, hist.length - 120);
+
+  try { localStorage.setItem('asset_history', JSON.stringify(hist)); } catch(e) {}
+  state.history = hist;
+
+  updateHistoryChart();
+  closeMFModal();
+
+  // 最新エントリで現在値も更新
+  const latest = hist[hist.length - 1];
+  if (latest && state.total === 0) {
+    state.total = latest.total;
+    state.byType.financial = latest.financial;
+    state.byType.cash = latest.cash;
+    updateUI();
+  }
+
+  const badge = document.getElementById('status-badge');
+  const monthCount = Object.keys(byMonth).length;
+  badge.textContent = `推移 ${monthCount}ヶ月分 取込完了 ✓`;
+  badge.className = 'status-badge ok';
+  setTimeout(() => { badge.textContent = `${monthCount}ヶ月分 蓄積済み`; }, 3000);
+}
+
+// ============================================================
+// CSV PARSE（互換維持）
+// ============================================================
+function parseAssetCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  const errors = [];
+  const assets = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const vals = line.split(',');
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = (vals[idx] || '').trim(); });
+    const amount = parseFloat(row.amount.replace(/,/g, ''));
+    if (isNaN(amount)) { errors.push(`行${i+1}: amountが数値ではありません`); continue; }
+    assets.push({ category: row.category, subcategory: row.subcategory || '',
+      name: row.name, amount, note: row.note || '', updated: row.updated || '' });
+  }
+
+  const byCategory = {};
+  let total = 0;
+  for (const a of assets) {
+    if (!byCategory[a.category]) byCategory[a.category] = { total: 0, items: [] };
+    byCategory[a.category].total += a.amount;
+    byCategory[a.category].items.push(a);
+    total += a.amount;
+  }
+
+  const FINANCIAL = ['日本株・ETF','米国株・ETF','投資信託','暗号資産'];
+  const REAL = ['太陽光発電'];
+  const CASH = ['現金・預金'];
+  const categories = Object.entries(byCategory).map(([name, d]) => ({
+    name, total: d.total, ratio: total > 0 ? d.total / total * 100 : 0, items: d.items
+  }));
+
+  return { assets, total, categories, errors,
+    byType: {
+      financial: FINANCIAL.reduce((s,c) => s + (byCategory[c]?.total||0), 0),
+      real:      REAL.reduce((s,c)      => s + (byCategory[c]?.total||0), 0),
+      cash:      CASH.reduce((s,c)      => s + (byCategory[c]?.total||0), 0),
+    }
+  };
+}
+
+// ============================================================
+// CHARTS
+// ============================================================
+let donutChart = null;
+let historyChart = null;
+
+function initDonut() {
+  const ctx = document.getElementById('donut-chart').getContext('2d');
+  donutChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0, hoverOffset: 4 }] },
+    options: {
+      cutout: '72%',
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: {
+          label: (ctx) => ` ${fmtM(ctx.parsed)} (${ctx.parsed > 0 ? (ctx.parsed/state.total*100).toFixed(1) : 0}%)`
+        }
+      }},
+      animation: { animateRotate: true, duration: 600 }
+    }
+  });
+}
+
+function initHistory() {
+  const ctx = document.getElementById('history-chart').getContext('2d');
+  historyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        borderColor: '#4ade80',
+        backgroundColor: 'rgba(74,222,128,0.05)',
+        borderWidth: 1.5,
+        pointRadius: 3,
+        pointBackgroundColor: '#4ade80',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: (c) => ' ' + fmtM(c.parsed.y) }
+      }},
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7280', font: { family: 'DM Mono', size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7280', font: { family: 'DM Mono', size: 11 },
+          callback: v => fmtM(v) } }
+      }
+    }
+  });
+}
+
+function updateDonut(categories) {
+  const labels = categories.map(c => c.name);
+  const data   = categories.map(c => c.total);
+  const colors = categories.map(c => CAT_COLORS[c.name] || '#888');
+  donutChart.data.labels = labels;
+  donutChart.data.datasets[0].data = data;
+  donutChart.data.datasets[0].backgroundColor = colors;
+  donutChart.update();
+}
+
+function getFilteredHistory() {
+  const all = state.history;
+  if (currentPeriod === 0 || all.length <= currentPeriod) return all;
+  return all.slice(-currentPeriod);
+}
+
+function updateHistoryChart() {
+  const hist = getFilteredHistory();
+  const labels = hist.map(h => h.date);
+  const data   = hist.map(h => h[currentHistoryKey] || 0);
+  const colorMap = { total: '#4ade80', financial: '#60a5fa', cash: '#94a3b8' };
+  const col = colorMap[currentHistoryKey];
+  historyChart.data.labels = labels;
+  historyChart.data.datasets[0].data = data;
+  historyChart.data.datasets[0].borderColor = col;
+  historyChart.data.datasets[0].backgroundColor = col + '0d';
+  historyChart.data.datasets[0].pointBackgroundColor = col;
+  // 期間が長い場合はポイントを小さく
+  historyChart.data.datasets[0].pointRadius = hist.length > 36 ? 1.5 : 3;
+  historyChart.update();
+
+  // タイトル更新
+  const periodLabel = currentPeriod === 0 ? '全期間' :
+    currentPeriod === 12 ? '1年' : currentPeriod === 36 ? '3年' :
+    currentPeriod === 60 ? '5年' : '10年';
+  document.getElementById('history-title').textContent = `資産推移（${periodLabel}）`;
+}
+
+function switchHistory(key, btn) {
+  currentHistoryKey = key;
+  document.querySelectorAll('.htab:not(.ptab)').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateHistoryChart();
+}
+
+function switchPeriod(months, btn) {
+  currentPeriod = months;
+  document.querySelectorAll('.ptab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updateHistoryChart();
+}
+
+// ============================================================
+// UI UPDATE
+// ============================================================
+function fmtM(v) {
+  if (v >= 1e8) return (v/1e8).toFixed(2) + '億';
+  if (v >= 1e4) return Math.round(v/1e4) + '万';
+  return Math.round(v).toLocaleString();
+}
+function fmtFull(v) { return Math.round(v).toLocaleString() + '円'; }
+
+function updateUI() {
+  const s = state;
+
+  // Header
+  document.getElementById('total-display').innerHTML =
+    fmtFull(s.total).replace('円','') + '<span class="unit">円</span>';
+  document.getElementById('dc-total').textContent = fmtM(s.total);
+  document.getElementById('header-meta').textContent =
+    s.lastUpdated ? `最終更新: ${s.lastUpdated}` : '';
+
+  // KPIs
+  const annualExp = parseFloat(document.getElementById('annual-expense').value) || 3600000;
+  const fireTarget = annualExp * 25;
+  const firePct = Math.min(s.total / fireTarget * 100, 100);
+  document.getElementById('kpi-fire-pct').textContent = firePct.toFixed(1) + '%';
+  document.getElementById('kpi-fire-target').textContent = fmtM(fireTarget);
+  document.getElementById('kpi-financial').textContent = fmtM(s.byType.financial);
+  const cashRatio = s.total > 0 ? s.byType.cash / s.total * 100 : 0;
+  document.getElementById('kpi-cash-ratio').textContent = cashRatio.toFixed(1) + '%';
+  document.getElementById('kpi-cash-sub').textContent = fmtFull(s.byType.cash);
+
+  // FIRE card
+  recalcFIRE();
+
+  // Donut
+  if (s.categories.length > 0) updateDonut(s.categories);
+
+  // Table
+  renderTable(s.categories, s.total);
+
+  // Legend
+  renderLegend(s.categories);
+}
+
+function recalcFIRE() {
+  const annualExp = parseFloat(document.getElementById('annual-expense').value) || 3600000;
+  const fireTarget = annualExp * 25;
+  const total = state.total;
+  const pct = total > 0 ? Math.min(total / fireTarget * 100, 100) : 0;
+  const gap = Math.max(fireTarget - total, 0);
+  const monthlyInvest = 3600000;
+  const years = gap > 0 ? (gap / monthlyInvest).toFixed(1) : 0;
+  const fireIncome = total * 0.04;
+
+  document.getElementById('fire-target-disp').textContent = fmtFull(fireTarget);
+  document.getElementById('fire-current').textContent = total > 0 ? fmtFull(total) : '—';
+  document.getElementById('fire-gap').textContent = gap > 0 ? fmtFull(gap) : '達成済み 🎉';
+  document.getElementById('fire-years').textContent = gap > 0 ? years + '年' : '—';
+  document.getElementById('fire-income').textContent = total > 0 ? fmtFull(fireIncome) : '—';
+  document.getElementById('fire-meter-fill').style.width = pct + '%';
+  document.getElementById('fire-pct-label').textContent = pct.toFixed(1) + '%';
+  document.getElementById('kpi-fire-pct').textContent = pct.toFixed(1) + '%';
+  document.getElementById('kpi-fire-target').textContent = fmtM(fireTarget);
+}
+
+function renderTable(categories, total) {
+  if (!categories.length) return;
+  const rows = categories.map(c => {
+    const color = CAT_COLORS[c.name] || '#888';
+    const pct = total > 0 ? (c.total/total*100).toFixed(1) : '0.0';
+    return `<tr>
+      <td>
+        <span class="cat-badge" style="color:${color};background:${color}18">${c.name}</span>
+      </td>
+      <td>
+        <div class="bar-wrap">
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);min-width:36px;text-align:right">${pct}%</span>
+        </div>
+      </td>
+      <td>${fmtFull(c.total)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('table-content').innerHTML = `
+    <table class="asset-table">
+      <thead><tr>
+        <th>カテゴリ</th>
+        <th>比率</th>
+        <th>残高</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderLegend(categories) {
+  if (!categories.length) return;
+  const items = categories.map(c => {
+    const color = CAT_COLORS[c.name] || '#888';
+    return `<div class="legend-item">
+      <div class="legend-dot" style="background:${color}"></div>
+      <span class="li-name">${c.name}</span>
+      <span class="li-pct">${c.ratio.toFixed(1)}%</span>
+    </div>`;
+  }).join('');
+  document.getElementById('donut-legend').innerHTML = items;
+}
+
+// ============================================================
+// HISTORY PERSISTENCE (localStorage)
+// ============================================================
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem('asset_history') || '[]');
+  } catch { return []; }
+}
+
+function saveHistoryEntry(data) {
+  const today = new Date();
+  const key = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+  const hist = loadHistory();
+  const existing = hist.findIndex(h => h.date === key);
+  const entry = { date: key, total: data.total, financial: data.byType.financial, cash: data.byType.cash };
+  if (existing >= 0) hist[existing] = entry;
+  else hist.push(entry);
+  hist.sort((a,b) => a.date.localeCompare(b.date));
+  if (hist.length > 120) hist.splice(0, hist.length - 120);
+  try { localStorage.setItem('asset_history', JSON.stringify(hist)); } catch(e) {}
+  return hist;
+}
+
+// ============================================================
+// FILE INPUT HANDLER
+// ============================================================
+document.getElementById('csv-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const text = ev.target.result;
+    const result = parseAssetCSV(text);
+
+    const badge = document.getElementById('status-badge');
+
+    if (result.errors.length > 0) {
+      badge.textContent = 'エラー: ' + result.errors[0];
+      badge.className = 'status-badge err';
+      return;
+    }
+    if (result.assets.length === 0) {
+      badge.textContent = 'データが空です';
+      badge.className = 'status-badge err';
+      return;
+    }
+
+    // State更新
+    const now = new Date();
+    state.total = result.total;
+    state.categories = result.categories;
+    state.byType = result.byType;
+    state.lastUpdated = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()}`;
+    state.history = saveHistoryEntry(result);
+
+    // UI更新
+    updateUI();
+    updateHistoryChart();
+
+    badge.textContent = '読み込み完了 ✓';
+    badge.className = 'status-badge ok';
+    setTimeout(() => {
+      badge.textContent = state.lastUpdated + ' 更新';
+    }, 2000);
+  };
+  reader.readAsText(file, 'UTF-8');
+  e.target.value = '';
+});
+
+// ============================================================
+// BACKUP: JSON エクスポート / インポート
+// ============================================================
+function exportJSON() {
+  closeBackupMenu();
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    history: state.history,
+    currentSnapshot: {
+      total: state.total,
+      categories: state.categories,
+      byType: state.byType,
+      lastUpdated: state.lastUpdated
+    }
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  a.href = url;
+  a.download = `asset_backup_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  const badge = document.getElementById('status-badge');
+  badge.textContent = 'バックアップ完了 ✓';
+  badge.className = 'status-badge ok';
+  setTimeout(() => { badge.textContent = state.lastUpdated ? state.lastUpdated + ' 更新' : '未読み込み'; }, 2500);
+}
+
+document.getElementById('json-import-input').addEventListener('change', (e) => {
+  closeBackupMenu();
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const payload = JSON.parse(ev.target.result);
+      if (!payload.history || !Array.isArray(payload.history)) throw new Error('不正なフォーマット');
+      // historyをマージ（既存 + インポート、重複は新しい方を優先）
+      const merged = [...state.history];
+      for (const entry of payload.history) {
+        const idx = merged.findIndex(h => h.date === entry.date);
+        if (idx >= 0) merged[idx] = entry;
+        else merged.push(entry);
+      }
+      merged.sort((a,b) => a.date.localeCompare(b.date));
+      if (merged.length > 120) merged.splice(0, merged.length - 120);
+      localStorage.setItem('asset_history', JSON.stringify(merged));
+      state.history = merged;
+      // スナップショットも復元
+      if (payload.currentSnapshot && payload.currentSnapshot.total > 0) {
+        const snap = payload.currentSnapshot;
+        state.total = snap.total;
+        state.categories = snap.categories || [];
+        state.byType = snap.byType || { financial:0, real:0, cash:0 };
+        state.lastUpdated = snap.lastUpdated || '';
+        updateUI();
+      }
+      updateHistoryChart();
+      const badge = document.getElementById('status-badge');
+      badge.textContent = `復元完了 ${merged.length}ヶ月分 ✓`;
+      badge.className = 'status-badge ok';
+      setTimeout(() => { badge.textContent = state.lastUpdated || '復元済み'; }, 3000);
+    } catch(err) {
+      alert('JSONの読み込みに失敗しました: ' + err.message);
+    }
+  };
+  reader.readAsText(file, 'UTF-8');
+  e.target.value = '';
+});
+
+// ============================================================
+// BACKUP MENU
+// ============================================================
+function toggleBackupMenu() {
+  const menu = document.getElementById('backup-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+function closeBackupMenu() {
+  document.getElementById('backup-menu').style.display = 'none';
+}
+// メニュー外クリックで閉じる
+document.addEventListener('click', (e) => {
+  if (!document.getElementById('backup-menu-wrap').contains(e.target)) {
+    closeBackupMenu();
+  }
+});
+
+// ============================================================
+// GOOGLE DRIVE 連携
+// ============================================================
+const DRIVE_URL_KEY    = 'asset_gas_url';
+const DRIVE_SECRET_KEY = 'asset_gas_secret';
+
+function loadDriveURL()    { return localStorage.getItem(DRIVE_URL_KEY)    || ''; }
+function loadDriveSecret() { return localStorage.getItem(DRIVE_SECRET_KEY) || ''; }
+function saveDriveURL(url)      { localStorage.setItem(DRIVE_URL_KEY,    url);    }
+function saveDriveSecret(secret){ localStorage.setItem(DRIVE_SECRET_KEY, secret); }
+
+function buildDriveURL(base) {
+  const secret = loadDriveSecret();
+  return secret ? `${base}?key=${encodeURIComponent(secret)}` : base;
+}
+
+function openDriveModal() {
+  closeBackupMenu();
+  document.getElementById('drive-modal').style.display = 'flex';
+  const savedURL    = loadDriveURL();
+  const savedSecret = loadDriveSecret();
+  if (savedURL)    document.getElementById('gas-url-input').value    = savedURL;
+  if (savedSecret) document.getElementById('gas-secret-input').value = savedSecret;
+  document.getElementById('drive-test-result').innerHTML = '';
+}
+function closeDriveModal() {
+  document.getElementById('drive-modal').style.display = 'none';
+}
+
+function toggleSecretVisibility() {
+  const input = document.getElementById('gas-secret-input');
+  const btn   = document.getElementById('secret-toggle-btn');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '隠す';
+  } else {
+    input.type = 'password';
+    btn.textContent = '表示';
+  }
+}
+
+function copyGASCode() {
+  const code = document.querySelector('#drive-modal pre').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.getElementById('gas-copy-btn');
+    btn.textContent = 'コピー済み ✓';
+    setTimeout(() => { btn.textContent = 'コピー'; }, 2000);
+  });
+}
+
+async function testDriveConnection() {
+  const url    = document.getElementById('gas-url-input').value.trim();
+  const secret = document.getElementById('gas-secret-input').value.trim();
+  const res    = document.getElementById('drive-test-result');
+  if (!url) { res.innerHTML = '<span style="color:var(--danger)">⚠ URLを入力してください</span>'; return; }
+  if (!secret) { res.innerHTML = '<span style="color:var(--danger)">⚠ シークレットキーを入力してください</span>'; return; }
+  res.innerHTML = '<span style="color:var(--muted)">接続テスト中...</span>';
+  try {
+    const testURL = `${url}?key=${encodeURIComponent(secret)}`;
+    const r = await fetch(testURL, { method: 'GET', mode: 'cors' });
+    const text = await r.text();
+    if (text.includes('unauthorized')) {
+      res.innerHTML = '<span style="color:var(--danger)">⚠ シークレットキーが一致しません。GASコードのSECRETと同じ値を入力してください</span>';
+    } else {
+      res.innerHTML = `<span style="color:var(--accent)">✓ 接続・認証 成功！</span>`;
+    }
+  } catch(e) {
+    res.innerHTML = `<span style="color:var(--danger)">⚠ 接続失敗: ${e.message}<br><span style="font-size:11px;">GASのデプロイ設定で「全員」アクセスを許可してください</span></span>`;
+  }
+}
+
+function saveDriveSettings() {
+  const url    = document.getElementById('gas-url-input').value.trim();
+  const secret = document.getElementById('gas-secret-input').value.trim();
+  if (!url)    { document.getElementById('drive-test-result').innerHTML = '<span style="color:var(--danger)">⚠ URLを入力してください</span>'; return; }
+  if (!secret) { document.getElementById('drive-test-result').innerHTML = '<span style="color:var(--danger)">⚠ シークレットキーを入力してください</span>'; return; }
+  saveDriveURL(url);
+  saveDriveSecret(secret);
+  document.getElementById('btn-save-drive').style.display = 'block';
+  closeDriveModal();
+  const badge = document.getElementById('status-badge');
+  badge.textContent = 'Drive連携 有効化 ✓';
+  badge.className = 'status-badge ok';
+  setTimeout(() => { badge.textContent = state.lastUpdated || '未読み込み'; }, 2500);
+}
+
+async function saveToDrive() {
+  closeBackupMenu();
+  const url = loadDriveURL();
+  if (!url) { alert('先にGoogle Drive設定を行ってください'); openDriveModal(); return; }
+  const payload = JSON.stringify({
+    version: 1, exportedAt: new Date().toISOString(),
+    history: state.history,
+    currentSnapshot: { total: state.total, categories: state.categories, byType: state.byType, lastUpdated: state.lastUpdated }
+  });
+  const badge = document.getElementById('status-badge');
+  badge.textContent = 'Drive保存中...';
+  badge.className = 'status-badge';
+  try {
+    const postURL = buildDriveURL(url);
+    const r = await fetch(postURL, {
+      method: 'POST', mode: 'cors',
+      body: payload, headers: { 'Content-Type': 'text/plain' }
+    });
+    const text = await r.text();
+    if (text.includes('unauthorized')) {
+      badge.textContent = '認証失敗 — キーを確認';
+      badge.className = 'status-badge err';
+    } else if (text.includes('ok') || r.ok) {
+      badge.textContent = 'Drive保存完了 ✓';
+      badge.className = 'status-badge ok';
+    } else {
+      badge.textContent = 'Drive保存失敗';
+      badge.className = 'status-badge err';
+    }
+  } catch(e) {
+    badge.textContent = '保存失敗: ' + e.message.slice(0, 30);
+    badge.className = 'status-badge err';
+  }
+  setTimeout(() => { badge.textContent = state.lastUpdated || '未読み込み'; badge.className = 'status-badge'; }, 3000);
+}
+
+async function loadFromDrive() {
+  const url = loadDriveURL();
+  if (!url) return;
+  try {
+    const getURL = buildDriveURL(url);
+    const r = await fetch(getURL, { method: 'GET', mode: 'cors' });
+    const text = await r.text();
+    if (!text || text === '[]' || text.includes('unauthorized')) return;
+    const payload = JSON.parse(text);
+    if (payload.history && Array.isArray(payload.history) && payload.history.length > 0) {
+      localStorage.setItem('asset_history', JSON.stringify(payload.history));
+      state.history = payload.history;
+      if (payload.currentSnapshot && payload.currentSnapshot.total > 0) {
+        const snap = payload.currentSnapshot;
+        state.total      = snap.total;
+        state.categories = snap.categories || [];
+        state.byType     = snap.byType || { financial: 0, real: 0, cash: 0 };
+        state.lastUpdated = snap.lastUpdated || '';
+      }
+      updateUI();
+      updateHistoryChart();
+      const badge = document.getElementById('status-badge');
+      badge.textContent = 'Driveから復元 ✓';
+      badge.className = 'status-badge ok';
+      setTimeout(() => { badge.textContent = state.lastUpdated || 'Drive連携中'; }, 2500);
+    }
+  } catch(e) {
+    console.log('Drive自動読み込みスキップ:', e.message);
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+initDonut();
+initHistory();
+updateHistoryChart();
+recalcFIRE();
+
+// Drive設定済みなら自動読み込み＆ボタン表示
+if (loadDriveURL()) {
+  document.getElementById('btn-save-drive').style.display = 'block';
+  loadFromDrive();
+}
+</script>
+</body>
+</html>
